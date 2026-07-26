@@ -1,0 +1,26 @@
+name: OCI ARM Auto Sniper
+
+on:
+  schedule:
+    # Berjalan automatik setiap 15 minit 24/7 di cloud GitHub
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Membolehkan korang tekan 'Run workflow' secara manual pada bila-bila masa
+
+jobs:
+  auto-snipe-job:
+    runs-on: ubuntu-latest
+    name: Run OCI Apply Job
+
+    env:
+      OCI_CLI_USER: ${{ secrets.OCI_USER }}
+      OCI_CLI_TENANCY: ${{ secrets.OCI_TENANCY }}
+      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+      OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_KEY_CONTENT }}
+      OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
+
+    steps:
+      - name: Trigger OCI Stack Apply Job
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
+        with:
+          command: 'resource-manager job create-apply-job --stack-id ${{ secrets.OCI_STACK_ID }} --execution-plan-strategy AUTO_APPROVED --display-name "Auto-Snipe-Task"'
+          silent: false

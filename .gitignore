@@ -1,0 +1,4 @@
+# Kunci Penting Tidak Boleh Masuk Ke Github
+.env.local
+.env.example
+.dev.vars
