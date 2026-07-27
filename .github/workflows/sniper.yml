@@ -26,9 +26,9 @@ jobs:
           command: 'resource-manager job create-apply-job --stack-id ${{ secrets.OCI_STACK_ID }} --execution-plan-strategy AUTO_APPROVED --display-name "Auto-Snipe-Task"'
           silent: false
 
-      # 2. Rehat / Delay 4 Saat
-      - name: Delay 4 Seconds
-        run: sleep 4
+      # 2. Rehat / Delay 10 Saat
+      - name: Delay 10 Seconds
+        run: sleep 10
 
       # 3. Semak jika VM Ampere ARM dah berjaya dicipta & status RUNNING
       - name: Check Running Instances
