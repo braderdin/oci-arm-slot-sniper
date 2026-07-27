@@ -1,9 +1,9 @@
 name: OCI ARM Auto Sniper
 
 on:
-#  schedule:
+  schedule:
     # Berjalan automatik setiap 15 minit 24/7 di cloud GitHub
-#    - cron: '*/15 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch: # Membolehkan korang tekan 'Run workflow' secara manual pada bila-bila masa
 
 jobs:
