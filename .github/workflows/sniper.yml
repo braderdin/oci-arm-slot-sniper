@@ -1,9 +1,9 @@
 name: OCI ARM Auto Sniper
 
 on:
-  schedule:
+#  schedule:
     # Berjalan automatik setiap 15 minit 24/7 di cloud GitHub
-    - cron: '*/15 * * * *'
+#    - cron: '*/15 * * * *'
   workflow_dispatch: # Membolehkan korang tekan 'Run workflow' secara manual pada bila-bila masa
 
 jobs:
@@ -19,57 +19,28 @@ jobs:
       OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
 
     steps:
-      # ==========================================
-      # PERCUBAAN PERTAMA (ATTEMPT 1)
-      # ==========================================
-      - name: [Attempt 1] Trigger OCI Apply Job
+      # 1. Trigger OCI Stack Apply Job
+      - name: Trigger OCI Stack Apply Job
         uses: oracle-actions/run-oci-cli-command@v1.3.2
         with:
-          command: 'resource-manager job create-apply-job --stack-id ${{ secrets.OCI_STACK_ID }} --execution-plan-strategy AUTO_APPROVED --display-name "Auto-Snipe-Attempt-1"'
+          command: 'resource-manager job create-apply-job --stack-id ${{ secrets.OCI_STACK_ID }} --execution-plan-strategy AUTO_APPROVED --display-name "Auto-Snipe-Task"'
           silent: false
 
-      # Tunggu 35 saat untuk OCI selesaikan proses Apply pertama
-      - name: Wait for OCI Provisioning (35 Seconds)
-        run: sleep 35
-
-      - name: [Attempt 1] Check Running Instances
-        id: check_vm1
-        uses: oracle-actions/run-oci-cli-command@v1.3.2
-        with:
-          command: 'compute instance list --compartment-id ${{ secrets.OCI_TENANCY }} --lifecycle-state RUNNING'
-          silent: true
-
-      # ==========================================
-      # PAUSE / DELAY 4 SAAT SEBELUM TRY KALI KE-2
-      # ==========================================
-      - name: Pause Delay 4 Seconds
+      # 2. Rehat / Delay 4 Saat
+      - name: Delay 4 Seconds
         run: sleep 4
 
-      # ==========================================
-      # PERCUBAAN KEDUA (ATTEMPT 2)
-      # ==========================================
-      - name: [Attempt 2] Trigger OCI Apply Job
-        uses: oracle-actions/run-oci-cli-command@v1.3.2
-        with:
-          command: 'resource-manager job create-apply-job --stack-id ${{ secrets.OCI_STACK_ID }} --execution-plan-strategy AUTO_APPROVED --display-name "Auto-Snipe-Attempt-2"'
-          silent: false
-
-      # Tunggu 35 saat untuk OCI selesaikan proses Apply kedua
-      - name: Wait for OCI Provisioning (35 Seconds)
-        run: sleep 35
-
-      - name: [Attempt 2] Check Running Instances
-        id: check_vm2
+      # 3. Semak jika VM Ampere ARM dah berjaya dicipta & status RUNNING
+      - name: Check Running Instances
+        id: check_vm
         uses: oracle-actions/run-oci-cli-command@v1.3.2
         with:
           command: 'compute instance list --compartment-id ${{ secrets.OCI_TENANCY }} --lifecycle-state RUNNING'
           silent: true
 
-      # ==========================================
-      # TELEGRAM NOTIFICATION (JIKA MANA-MANA BERJAYA)
-      # ==========================================
+      # 4. Hantar Telegram Alert HANYA jika VM.Standard.A1.Flex dijumpai
       - name: Send Telegram Alert
-        if: contains(steps.check_vm1.outputs.output, 'VM.Standard.A1.Flex') || contains(steps.check_vm2.outputs.output, 'VM.Standard.A1.Flex')
+        if: contains(steps.check_vm.outputs.output, 'VM.Standard.A1.Flex')
         run: |
           MESSAGE="🚀 *TAHNIAH BRO! VM OCI ARM DAH SIAP!*%0A%0AStatus: *RUNNING*%0ASpecification: 4 OCPU / 24 GB RAM / 200 GB Storage%0A%0ASila log masuk ke OCI Console sekarang!"
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
