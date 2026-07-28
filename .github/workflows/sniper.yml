@@ -1,193 +1,51 @@
-name: OCI ARM Auto Sniper (Abang Version - Fixed)
+name: OCI ARM Auto Sniper (Classic Pure 100%)
 
 on:
 #  schedule:
+    # 3x Offset Timing untuk pintas pelepasan slot OCI di Singapore
 #    - cron: '0,15,30,45 * * * *'   # Standard quarters
 #    - cron: '2,17,32,47 * * * *'   # Offset +2 min
 #    - cron: '5,20,35,50 * * * *'   # Offset +5 min
-  workflow_dispatch:
-    inputs:
-      debug:
-        description: 'Enable debug logging'
-        type: boolean
-        default: false
-
-env:
-  OCI_CLI_USER: ${{ secrets.OCI_USER }}
-  OCI_CLI_TENANCY: ${{ secrets.OCI_TENANCY }}
-  OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
-  OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_KEY_CONTENT }}
-  OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
-  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  workflow_dispatch: # Boleh run manual bila-bila masa
 
 jobs:
-  snipe:
-    name: Snipe ARM Instance
+  auto-snipe-job:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    name: Run OCI Apply Job & Notify
+
+    env:
+      OCI_CLI_USER: ${{ secrets.OCI_USER }}
+      OCI_CLI_TENANCY: ${{ secrets.OCI_TENANCY }}
+      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+      OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_KEY_CONTENT }}
+      OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
+
     steps:
-      # 1️⃣ TRIGGER APPLY JOB (Fixed: Single line command & continue-on-error)
-      - name: Trigger OCI Stack Apply
-        id: apply
+      # 1. Trigger OCI Stack Apply Job (Sama 100% macam kod lama korang)
+      - name: Trigger OCI Stack Apply Job
         uses: oracle-actions/run-oci-cli-command@v1.3.2
-        continue-on-error: true
         with:
-          command: 'resource-manager job create-apply-job --stack-id ${{ secrets.OCI_STACK_ID }} --execution-plan-strategy AUTO_APPROVED --display-name "Auto-Snipe-${{ github.run_id }}-${{ github.run_attempt }}"'
+          command: 'resource-manager job create-apply-job --stack-id ${{ secrets.OCI_STACK_ID }} --execution-plan-strategy AUTO_APPROVED --display-name "Auto-Snipe-Task"'
           silent: false
 
-      # 1️⃣.5️⃣ CHECK TRIGGER ERROR (Tapis 429 / 500 / Rate Limit semasa Trigger)
-      - name: Check Trigger Status
-        id: check_trigger
-        if: steps.apply.outcome == 'failure'
-        run: |
-          OUTPUT="${{ steps.apply.outputs.output }}"
-          echo "⚠️ Trigger OCI API Failed:"
-          echo "$OUTPUT"
-          
-          # Check jika error sebab Rate Limit (429), Capacity (500), atau Too Many Requests
-          if echo "$OUTPUT" | grep -qi "too many requests\|toomanyrequests\|429\|out of host capacity\|no host capacity\|capacity.*unavailable\|500\|internal error"; then
-            echo "☁️ Ignored API Error (429 Rate Limit / Capacity / 500) - Exit clean tanpa alert Telegram."
-            echo "status=IGNORED" >> $GITHUB_OUTPUT
-            exit 0
-          else
-            echo "❌ Real Trigger Error Detected!"
-            echo "status=TRIGGER_FAILED" >> $GITHUB_OUTPUT
-            echo "fail_detail=$OUTPUT" >> $GITHUB_OUTPUT
-            exit 1
-          fi
+      # 2. Delay 30 Saat (Bagi masa OCI Resource Manager hantar task ke backend)
+      - name: Delay 30 Seconds
+        run: sleep 30
 
-      # 2️⃣ POLL JOB SAMPAI SIAP (Hanya jika Trigger Langkah 1 Berjaya)
-      - name: Wait for Job Completion
-        if: steps.apply.outcome == 'success'
-        id: wait
-        run: |
-          set -euo pipefail
-          JOB_OCID=$(echo "${{ steps.apply.outputs.output }}" | jq -r '.data.id // empty')
-          
-          if [ -z "$JOB_OCID" ]; then
-            echo "❌ Failed to get Job OCID"
-            exit 1
-          fi
-          
-          echo "🔄 Job ID: $JOB_OCID - polling..."
-          
-          for i in {1..40}; do  # 40 x 30s = 20 min max
-            STATUS=$(oci resource-manager job get --job-id "$JOB_OCID" --query 'data."lifecycle-state"' --raw-output 2>/dev/null || echo "ERROR")
-            
-            case $STATUS in
-              SUCCEEDED)
-                echo "✅ Job SUCCEEDED"
-                echo "status=SUCCEEDED" >> $GITHUB_OUTPUT
-                exit 0
-                ;;
-              FAILED|CANCELED)
-                FAIL_DETAIL=$(oci resource-manager job get --job-id "$JOB_OCID" --query 'data."failure-details"' --raw-output 2>/dev/null || echo "")
-                
-                # 👇 CHECK TAPISAN: Out of Capacity, 429, 500, Too Many Requests = Exit Clean (Tak Alert Telegram)
-                if echo "$FAIL_DETAIL" | grep -qi "out of host capacity\|no host capacity\|capacity.*unavailable\|too many requests\|toomanyrequests\|429\|500\|internal error"; then
-                  echo "☁️ Capacity / Rate Limit / 500 Error - Exit clean (Abaikan Alert)"
-                  echo "status=IGNORED" >> $GITHUB_OUTPUT
-                  echo "fail_detail=$FAIL_DETAIL" >> $GITHUB_OUTPUT
-                  exit 0  # ✅ Exit 0 = Success di GitHub, tiada alert Telegram
-                fi
-                
-                # Jika error pelik-pelik selain di atas
-                echo "❌ Job FAILED dengan Ralat Pelik: $FAIL_DETAIL"
-                echo "status=FAILED" >> $GITHUB_OUTPUT
-                echo "fail_detail=$FAIL_DETAIL" >> $GITHUB_OUTPUT
-                exit 1
-                ;;
-              ACCEPTED|IN_PROGRESS)
-                if [ "${{ inputs.debug }}" = "true" ]; then
-                  echo "⏳ Status: $STATUS (poll $i/40)"
-                fi
-                ;;
-              *)
-                echo "⚠️ Unknown status: $STATUS"
-                ;;
-            esac
-            
-            sleep 30
-          done
-          
-          echo "⏱️ Timeout after 20 minutes"
-          echo "status=TIMEOUT" >> $GITHUB_OUTPUT
-          exit 1
+      # 3. Semak jika VM Ampere ARM dah berstatus RUNNING (Sama 100% macam kod lama)
+      - name: Check Running Instances
+        id: check_vm
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
+        with:
+          command: 'compute instance list --compartment-id ${{ secrets.OCI_TENANCY }} --lifecycle-state RUNNING'
+          silent: true
 
-      # 3️⃣ VERIFY INSTANCE RUNNING (Hanya jika Job SUCCEEDED)
-      - name: Verify ARM Instance Running
-        if: steps.wait.outputs.status == 'SUCCEEDED'
-        id: verify
+      # 4. Hantar Telegram Alert HANYA jika VM.Standard.A1.Flex dijumpai
+      - name: Send Telegram Alert
+        if: contains(steps.check_vm.outputs.output, 'VM.Standard.A1.Flex')
         run: |
-          set -euo pipefail
-          
-          # Tunggu sebentar untuk instance fully provisioned
-          sleep 20
-          
-          INSTANCES=$(oci compute instance list \
-            --compartment-id "${OCI_CLI_TENANCY}" \
-            --lifecycle-state RUNNING \
-            --query "data[?contains(shape, 'VM.Standard.A1.Flex')].{id:id, shape:shape, ocpus:shape-config.ocpus, memory:shape-config.memory_in_gbs, ad:availability-domain, time:time-created}" \
-            --output json)
-          
-          COUNT=$(echo "$INSTANCES" | jq 'length')
-          
-          if [ "$COUNT" -gt 0 ]; then
-            NEWEST=$(echo "$INSTANCES" | jq -r 'max_by(.time)')
-            INSTANCE_ID=$(echo "$NEWEST" | jq -r '.id')
-            OCPUS=$(echo "$NEWEST" | jq -r '.ocpus')
-            MEMORY=$(echo "$NEWEST" | jq -r '.memory')
-            AD=$(echo "$NEWEST" | jq -r '.ad')
-            
-            echo "✅ Found RUNNING ARM: $INSTANCE_ID ($OCPUS OCPU / ${MEMORY}GB RAM)"
-            echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
-            echo "ocpus=$OCPUS" >> $GITHUB_OUTPUT
-            echo "memory=$MEMORY" >> $GITHUB_OUTPUT
-            echo "ad=$AD" >> $GITHUB_OUTPUT
-          else
-            echo "⚠️ Job succeeded tapi takde instance RUNNING (mungkin still provisioning)"
-            echo "instance_id=" >> $GITHUB_OUTPUT
-          fi
-
-      # 4️⃣ TELEGRAM ALERT - HANYA BILA BERJAYA
-      - name: Send Telegram Success Alert
-        if: steps.verify.outputs.instance_id != ''
-        run: |
-          INSTANCE_ID="${{ steps.verify.outputs.instance_id }}"
-          OCPUS="${{ steps.verify.outputs.ocpus }}"
-          MEMORY="${{ steps.verify.outputs.memory }}"
-          AD="${{ steps.verify.outputs.ad }}"
-          
-          MESSAGE="🚀 *TAHNIAH! VM OCI ARM BERJAYA DICIPTA!*%0A%0A"
-          MESSAGE+="🆔 ID: \`$INSTANCE_ID\`%0A"
-          MESSAGE+="⚡ Spec: *$OCPUS OCPU / ${MEMORY}GB RAM*%0A"
-          MESSAGE+="📍 AD: $AD%0A"
-          MESSAGE+="🌍 Region: *${OCI_CLI_REGION}*%0A%0A"
-          MESSAGE+="✅ Status: *RUNNING & READY*%0A"
-          MESSAGE+="🔗 [Buka Console](https://cloud.oracle.com/compute/instances/$INSTANCE_ID?region=${OCI_CLI_REGION})"
-          
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_CHAT_ID}" \
-            -d "text=$MESSAGE" \
-            -d "parse_mode=Markdown" \
-            -d "disable_web_page_preview=true"
-          
-          echo "✅ Success Alert sent to Telegram"
-
-      # 5️⃣ TELEGRAM ALERT - HANYA BILA RALAT PELIK (Bukan Capacity / Bukan 429 / Bukan 500)
-      - name: Notify Real Failure Only
-        if: always() && (steps.wait.outputs.status == 'FAILED' || steps.check_trigger.outputs.status == 'TRIGGER_FAILED')
-        run: |
-          FAIL_MSG="${{ steps.wait.outputs.fail_detail || steps.check_trigger.outputs.fail_detail }}"
-          
-          MESSAGE="❌ *OCI JOB GAGAL (RALAT TEKNIKAL / PELIK)*%0A%0A"
-          MESSAGE+="📋 Detail: \`$FAIL_MSG\`%0A"
-          MESSAGE+="🌍 Region: ${OCI_CLI_REGION}%0A"
-          MESSAGE+="⏰ Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')%0A%0A"
-          MESSAGE+="🔧 Sila periksa OCI Console atau Stack settings."
-          
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+          MESSAGE="🚀 *TAHNIAH BRO! VM OCI ARM BERJAYA DICIPTA!*%0A%0AStatus: *RUNNING*%0ASpecification: 2 OCPU / 12 GB RAM / 200 GB Storage%0ARegion: *${{ secrets.OCI_REGION }}*%0A%0ASila log masuk ke OCI Console sekarang!"
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d "text=$MESSAGE" \
             -d "parse_mode=Markdown"
