@@ -5,7 +5,6 @@ on:
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
-# Elakkan dua job berjalan serentak jika job lama masih berjalan
 concurrency:
   group: oci-sniper-group
   cancel-in-progress: false
@@ -13,11 +12,11 @@ concurrency:
 jobs:
   snipe:
     runs-on: ubuntu-latest
-    timeout-minutes: 30 # Matikan job secara automatik jika melebihi 30 minit
-    
+    timeout-minutes: 30
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -26,16 +25,24 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Create OCI Private Key File
+        env:
+          RAW_KEY: ${{ secrets.OCI_KEY_CONTENT }}
+        run: |
+          mkdir -p ~/.oci
+          echo "$RAW_KEY" | base64 -d > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+
       - name: Run Sniper Loop
         env:
           OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
           OCI_USER: ${{ secrets.OCI_USER }}
           OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
           OCI_REGION: ${{ secrets.OCI_REGION }}
-          OCI_KEY_CONTENT: ${{ secrets.OCI_KEY_CONTENT }}
+          OCI_KEY_FILE: /home/runner/.oci/oci_api_key.pem
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
+          OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
         run: |
-          # 10 percubaan x 30 saat = ~5 minit larian (selamat di bawah timeout 30 minit)
           for i in {1..10}; do
             echo "--- Tembakan ke-$i ---"
             python python_script/Ampere_A1_12gbram_2ocpu.py || true
