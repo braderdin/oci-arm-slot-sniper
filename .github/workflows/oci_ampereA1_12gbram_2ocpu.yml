@@ -25,12 +25,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Create OCI Private Key File
+      - name: Decrypt OCI Private Key File
         env:
-          RAW_KEY: ${{ secrets.OCI_KEY_CONTENT }}
+          PASSPHRASE: ${{ secrets.OCI_KEY_PASSPHRASE }}
         run: |
           mkdir -p ~/.oci
-          echo "$RAW_KEY" | base64 -d > ~/.oci/oci_api_key.pem
+          gpg --quiet --batch --yes --decrypt --passphrase "$PASSPHRASE" \
+            --output ~/.oci/oci_api_key.pem \
+            python_script/2026-07-26T17_31_09.593Z.pem.gpg
           chmod 600 ~/.oci/oci_api_key.pem
 
       - name: Run Sniper Loop
