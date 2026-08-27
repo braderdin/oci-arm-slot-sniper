@@ -1,8 +1,8 @@
-name: OCI VM Status Daily Report
+name: OCI VM Status Daily Report v2
 
 on:
-#  schedule:
-#    - cron: '0 0,12 * * *'  # Berjalan jam 8:00 AM & 8:00 PM (MYT / UTC+8)
+  schedule:
+    - cron: '0 0,12 * * *'  # Berjalan jam 8:00 AM & 8:00 PM (MYT / UTC+8)
   workflow_dispatch:
 
 jobs:
@@ -19,13 +19,23 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Decrypt OCI Private Key File
+        env:
+          PASSPHRASE: ${{ secrets.OCI_KEY_PASSPHRASE }}
+        run: |
+          mkdir -p ~/.oci
+          gpg --quiet --batch --yes --decrypt --passphrase "$PASSPHRASE" \
+            --output ~/.oci/oci_api_key.pem \
+            python_script/braderdin007@gmail.com-2026-07-26T17_31_09.593Z.pem.gpg
+          chmod 600 ~/.oci/oci_api_key.pem
+
       - name: Run VM Status Checker
         env:
           OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
           OCI_USER: ${{ secrets.OCI_USER }}
           OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
           OCI_REGION: ${{ secrets.OCI_REGION }}
-          OCI_KEY_CONTENT: ${{ secrets.OCI_KEY_CONTENT }}
+          OCI_KEY_FILE: /home/runner/.oci/oci_api_key.pem
           OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
