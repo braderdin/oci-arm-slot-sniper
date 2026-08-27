@@ -1,6 +1,8 @@
 # Kunci Penting Tidak Boleh Masuk Ke Github
 .env.local
+.env.gh.example
 .env.example
 .dev.vars
 trik-on-off.md
+archive/
 kod-yang-berjaya-sebelum-ini/

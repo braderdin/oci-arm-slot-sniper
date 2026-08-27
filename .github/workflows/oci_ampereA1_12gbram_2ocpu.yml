@@ -1,0 +1,43 @@
+name: OCI ARM Sniper Loop
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+# Elakkan dua job berjalan serentak jika job lama masih berjalan
+concurrency:
+  group: oci-sniper-group
+  cancel-in-progress: false
+
+jobs:
+  snipe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30 # Matikan job secara automatik jika melebihi 30 minit
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Sniper Loop
+        env:
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_KEY_CONTENT: ${{ secrets.OCI_KEY_CONTENT }}
+          OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
+        run: |
+          # 10 percubaan x 30 saat = ~5 minit larian (selamat di bawah timeout 30 minit)
+          for i in {1..10}; do
+            echo "--- Tembakan ke-$i ---"
+            python python_script/Ampere_A1_12gbram_2ocpu.py || true
+            sleep 30
+          done
