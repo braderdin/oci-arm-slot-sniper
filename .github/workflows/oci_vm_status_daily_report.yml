@@ -26,7 +26,7 @@ jobs:
           mkdir -p ~/.oci
           gpg --quiet --batch --yes --decrypt --passphrase "$PASSPHRASE" \
             --output ~/.oci/oci_api_key.pem \
-            python_script/braderdin007@gmail.com-2026-07-26T17_31_09.593Z.pem.gpg
+            python_script/2026-07-26T17_31_09.593Z.pem.gpg
           chmod 600 ~/.oci/oci_api_key.pem
 
       - name: Run VM Status Checker
