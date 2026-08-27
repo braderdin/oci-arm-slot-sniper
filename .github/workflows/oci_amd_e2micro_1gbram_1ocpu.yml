@@ -58,7 +58,19 @@ jobs:
             --output python_script/tokens.tok \
             python_script/tokens.tok.gpg
 
-      - name: Run AMD Sniper Loop
+# --- TAMBAH STEP INI SEBAGAI STEP 1 SEMAKAN ---
+      - name: Step 1 - Check Existing AMD VM
+        env:
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_KEY_FILE: /home/runner/.oci/oci_api_key.pem
+          OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
+        run: python python_script/check_vm_status.py --shape AMD
+
+      # --- STEP 2 TEMBAKAN AKAN BERJALAN HANYA JIKA STEP 1 LULUS ---
+      - name: Step 2 - Run AMD Sniper Loop
         env:
           OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
           OCI_USER: ${{ secrets.OCI_USER }}
