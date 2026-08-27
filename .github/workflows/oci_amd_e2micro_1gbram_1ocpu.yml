@@ -1,8 +1,8 @@
 name: OCI AMD Sniper Loop (Every 20 Mins) v2
 
 on:
-  schedule:
-    - cron: '*/20 * * * *'
+#  schedule:
+#    - cron: '*/20 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   snipe-amd:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 14
     
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +69,7 @@ jobs:
           OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
         run: python python_script/check_vm_status.py --shape AMD
 
-      # --- STEP 2 TEMBAKAN AKAN BERJALAN HANYA JIKA STEP 1 LULUS ---
+# --- STEP 2 TEMBAKAN AKAN BERJALAN HANYA JIKA STEP 1 LULUS ---
       - name: Step 2 - Run AMD Sniper Loop
         env:
           OCI_TENANCY: ${{ secrets.OCI_TENANCY }}

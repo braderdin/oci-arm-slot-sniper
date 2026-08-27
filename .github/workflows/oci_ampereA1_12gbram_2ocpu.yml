@@ -1,8 +1,8 @@
 name: OCI ARM Sniper Loop (Every 15 Mins)
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'
+#  schedule:
+#    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   snipe-arm:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 14
 
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +58,19 @@ jobs:
             --output python_script/tokens.tok \
             python_script/tokens.tok.gpg
 
-      - name: Run ARM Sniper Loop
+# --- TAMBAH STEP INI SEBAGAI STEP 1 SEMAKAN ---
+      - name: Step 1 - Check Existing ARM VM
+        env:
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_KEY_FILE: /home/runner/.oci/oci_api_key.pem
+          OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
+        run: python python_script/check_vm_status.py --shape ARM
+
+# --- STEP 2 TEMBAKAN AKAN BERJALAN HANYA JIKA STEP 1 LULUS ---
+      - name: Step 2 - Run ARM Sniper Loop
         env:
           OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
           OCI_USER: ${{ secrets.OCI_USER }}
