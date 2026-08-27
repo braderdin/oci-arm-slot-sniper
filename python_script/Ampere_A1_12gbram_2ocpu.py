@@ -189,7 +189,7 @@ def run_sniper():
     shape = "VM.Standard.A1.Flex"
     ocpus = 2.0
     memory_in_gbs = 12.0
-    boot_volume_size_gbs = 148
+    boot_volume_size_gbs = 100
 
     print("\n" + "=" * 65)
     print(" 🚀 MENJALANKAN TEMBAKAN PERMOHONAN SLOT VM ARM ALWAYS FREE")
