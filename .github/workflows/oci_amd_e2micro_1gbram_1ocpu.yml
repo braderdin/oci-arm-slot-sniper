@@ -1,8 +1,8 @@
 name: OCI AMD Sniper Loop (Every 20 Mins) v2
 
 on:
-#  schedule:
-#    - cron: '*/20 * * * *'
+  schedule:
+    - cron: '*/20 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   snipe-amd:
     runs-on: ubuntu-latest
-    timeout-minutes: 14
+    timeout-minutes: 30
     
     steps:
       - uses: actions/checkout@v4
@@ -25,15 +25,38 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Decrypt OCI Private Key File
+      - name: Decrypt All 5 GPG Key Files
         env:
           PASSPHRASE: ${{ secrets.OCI_KEY_PASSPHRASE }}
         run: |
-          mkdir -p ~/.oci
+          mkdir -p ~/.oci ~/.ssh
+          
+          # 1. API Private Key (.pem)
           gpg --quiet --batch --yes --decrypt --passphrase "$PASSPHRASE" \
             --output ~/.oci/oci_api_key.pem \
-            python_script/2026-07-26T17_31_09.593Z.pem.gpg
+            python_script/braderdin007@gmail.com-2026-07-26T17_31_09.593Z.pem.gpg
           chmod 600 ~/.oci/oci_api_key.pem
+
+          # 2. API Public Key (.pem)
+          gpg --quiet --batch --yes --decrypt --passphrase "$PASSPHRASE" \
+            --output ~/.oci/oci_api_key_public.pem \
+            python_script/braderdin007@gmail.com-2026-07-26T17_31_13.660Z_public.pem.gpg
+
+          # 3. SSH Private Key
+          gpg --quiet --batch --yes --decrypt --passphrase "$PASSPHRASE" \
+            --output ~/.ssh/ssh-key-2026-07-27.key \
+            python_script/ssh-key-2026-07-27.key.gpg
+          chmod 600 ~/.ssh/ssh-key-2026-07-27.key
+
+          # 4. SSH Public Key (.pub)
+          gpg --quiet --batch --yes --decrypt --passphrase "$PASSPHRASE" \
+            --output python_script/ssh-key-2026-07-27.key.pub \
+            python_script/ssh-key-2026-07-27.key.pub.gpg
+
+          # 5. Token File
+          gpg --quiet --batch --yes --decrypt --passphrase "$PASSPHRASE" \
+            --output python_script/tokens.tok \
+            python_script/tokens.tok.gpg
 
       - name: Run AMD Sniper Loop
         env:
@@ -44,9 +67,10 @@ jobs:
           OCI_KEY_FILE: /home/runner/.oci/oci_api_key.pem
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
           OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
+          GPG_PASSPHRASE: ${{ secrets.OCI_KEY_PASSPHRASE }}
         run: |
           for i in {1..10}; do
             echo "--- Tembakan AMD ke-$i ---"
-            python python_script/AMD_e2micro_1gbram_1ocpu.py || true
+            python python_script/Amd_micro_1gbram_1ocpu.py || true
             sleep 30
           done
