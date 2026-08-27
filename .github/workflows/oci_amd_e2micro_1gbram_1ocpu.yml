@@ -1,4 +1,4 @@
-name: OCI AMD Sniper Loop (Every 20 Mins)
+name: OCI AMD Sniper Loop (Every 20 Mins) v2
 
 on:
   schedule:

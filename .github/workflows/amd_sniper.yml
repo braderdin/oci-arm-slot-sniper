@@ -1,8 +1,8 @@
 name: OCI AMD Sniper Loop (Every 20 Mins)
 
 on:
-  schedule:
-    - cron: '*/20 * * * *'  # Berjalan setiap 20 minit
+#  schedule:
+#    - cron: '*/20 * * * *'  # Berjalan setiap 20 minit
   workflow_dispatch:        # Boleh di-run secara manual dari dashboard GitHub
 
 concurrency:
