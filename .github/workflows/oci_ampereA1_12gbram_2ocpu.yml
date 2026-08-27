@@ -22,6 +22,17 @@ jobs:
         with:
           python-version: '3.11'
 
+# ---  Pulihkan Cache Pip & Model Hugging Face Sedia Ada
+      - name: ⚡ Pulihkan Cache Pip
+        id: pipeline-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+          key: ${{ runner.os }}-ircm-cache-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-ircm-cache-
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 

@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # 1. Pantau Pustaka Python (requirements.txt)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"       # Semak kemas kini sekali seminggu
+    open-pull-requests-limit: 5 # Had maksimum 5 PR serentak supaya tidak serabut
+
+  # 2. Pantau GitHub Actions Workflow (actions/checkout, setup-python, dll)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"      # Semak versi Action sebulan sekali
+    open-pull-requests-limit: 3
