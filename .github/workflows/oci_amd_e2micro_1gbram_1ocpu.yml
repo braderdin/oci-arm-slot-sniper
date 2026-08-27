@@ -1,8 +1,8 @@
 name: OCI AMD Sniper Loop (Every 20 Mins) v2
 
 on:
-  schedule:
-    - cron: '*/20 * * * *'
+#  schedule:
+#    - cron: '*/20 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   snipe-amd:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 14
     
     steps:
       - uses: actions/checkout@v4
