@@ -43,7 +43,6 @@ def validate_config():
     subnet_id = get_env_var(["OCI_SUBNET_ID", "SUBNET_ID"])
     ssh_public_key = get_env_var(["OCI_SSH_PUBLIC_KEY", "SSH_PUBLIC_KEY"])
 
-    # Semakan tempatan jika OCI_KEY_FILE tidak diset oleh GitHub Actions
     if not key_file and not key_content:
         local_key_path = "kunci_oci/oci-oracle-api-key/braderdin007@gmail.com-2026-07-26T17_31_09.593Z.pem"
         if os.path.exists(local_key_path):
@@ -80,7 +79,7 @@ def validate_config():
 
 
 def find_ubuntu_arm_image(compute_client, compartment_id):
-    print("[INFO] Mencari Image Ubuntu ARM (aarch64) secara automatik...")
+    print("[INFO] Mencari Image Ubuntu 22.04 Standard (Bukan Minimal)...")
     try:
         images = compute_client.list_images(
             compartment_id=compartment_id,
@@ -90,13 +89,27 @@ def find_ubuntu_arm_image(compute_client, compartment_id):
             sort_order="DESC"
         ).data
 
+        # 1. Keutamaan Utama: Cari Ubuntu 22.04 TANPA perkataan 'minimal'
         for img in images:
-            if "aarch64" in img.operating_system_version.lower() or "arm" in img.display_name.lower() or "ubuntu" in img.display_name.lower():
-                print(f"[SUCCESS] Dijumpai Image Ubuntu ARM: {img.display_name}")
+            name_lower = img.display_name.lower()
+            if "22.04" in name_lower and "minimal" not in name_lower:
+                print(f"[SUCCESS] Dijumpai Image Ubuntu 22.04 Standard: {img.display_name}")
                 return img.id
-        if images:
-            print(f"[SUCCESS] Menggunakan Image fallback: {images[0].display_name}")
-            return images[0].id
+
+        # 2. Fallback 1: Cari mana-mana Ubuntu 24.04 Standard (bukan minimal) jika 22.04 tiada
+        for img in images:
+            name_lower = img.display_name.lower()
+            if "24.04" in name_lower and "minimal" not in name_lower:
+                print(f"[SUCCESS] Dijumpai Image Ubuntu 24.04 Standard: {img.display_name}")
+                return img.id
+
+        # 3. Fallback 2: Mana-mana imej Ubuntu yang bukan Minimal
+        for img in images:
+            name_lower = img.display_name.lower()
+            if "minimal" not in name_lower:
+                print(f"[SUCCESS] Dijumpai Image Non-Minimal: {img.display_name}")
+                return img.id
+
     except Exception as e:
         print(f"[RALAT] Gagal mendapatkan senarai image Ubuntu: {str(e)}")
     return None
