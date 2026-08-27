@@ -12,7 +12,7 @@ elif os.path.exists(".env"):
 try:
     import oci
 except ImportError:
-    print("[RALAT KRITIKAL] Pustaka 'oci' belum dipasang.")
+    print("❌ [RALAT KRITIKAL] Pustaka 'oci' belum dipasang.")
     sys.exit(1)
 
 
@@ -27,8 +27,7 @@ def decrypt_gpg(gpg_file_path, passphrase):
         ]
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return res.stdout.strip()
-    except Exception as e:
-        print(f"❌ [RALAT DECRYPT GPG] {gpg_file_path}: {e}")
+    except Exception:
         return None
 
 
@@ -43,9 +42,9 @@ def get_env_var(keys, default=None):
 
 
 def validate_config():
-    print("=" * 60)
+    print("=" * 65)
     print(" MENYEMAK KUNCI GPG & AUTENTIKASI OCI (AMD MICRO)")
-    print("=" * 60)
+    print("=" * 65)
 
     tenancy = get_env_var(["OCI_TENANCY", "TENANCY", "tenancy"])
     user = get_env_var(["OCI_USER", "USER", "user"])
@@ -53,32 +52,43 @@ def validate_config():
     region = get_env_var(["OCI_REGION", "REGION", "region"], "ap-singapore-1")
     compartment_id = get_env_var(["OCI_COMPARTMENT_ID", "COMPARTMENT_ID"]) or tenancy
     subnet_id = get_env_var(["OCI_SUBNET_ID", "SUBNET_ID"])
-    gpg_passphrase = get_env_var(["GPG_PASSPHRASE", "PASSPHRASE"])
+    key_file_env = get_env_var(["OCI_KEY_FILE", "KEY_FILE"])
+    gpg_passphrase = get_env_var(["GPG_PASSPHRASE", "OCI_KEY_PASSPHRASE", "PASSPHRASE"])
 
-    if not gpg_passphrase:
-        print("❌ [RALAT KRITIKAL] GPG_PASSPHRASE tiada dalam fail .env atau GitHub Secrets.")
+    key_file_path = None
+    ssh_public_key = None
+
+    # 1. Semakan API Private Key (.pem)
+    if key_file_env and os.path.exists(key_file_env):
+        key_file_path = key_file_env
+        print(f"✓ API Private Key dibaca dari fail: {key_file_path}")
+    elif gpg_passphrase:
+        api_gpg = "python_script/braderdin007@gmail.com-2026-07-26T17_31_09.593Z.pem.gpg"
+        pem_content = decrypt_gpg(api_gpg, gpg_passphrase)
+        if pem_content:
+            tmp_key = tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.pem')
+            tmp_key.write(pem_content)
+            tmp_key.close()
+            key_file_path = tmp_key.name
+            print("✓ API Private Key (.pem.gpg) berjaya dinyahsulit.")
+
+    if not key_file_path:
+        print("❌ [RALAT KRITIKAL] API Private Key gagal dijumpai atau dinyahsulit!")
         sys.exit(1)
 
-    # 1. Decrypt API Key (.pem.gpg)
-    api_gpg = "python_script/braderdin007@gmail.com-2026-07-26T17_31_09.593Z.pem.gpg"
-    pem_content = decrypt_gpg(api_gpg, gpg_passphrase)
-    if not pem_content:
-        print("❌ Gagal menyahsulit API Key .pem.gpg!")
-        sys.exit(1)
+    # 2. Semakan SSH Public Key (.pub)
+    if gpg_passphrase:
+        ssh_pub_gpg = "python_script/ssh-key-2026-07-27.key.pub.gpg"
+        ssh_public_key = decrypt_gpg(ssh_pub_gpg, gpg_passphrase)
 
-    tmp_key = tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.pem')
-    tmp_key.write(pem_content)
-    tmp_key.close()
-    key_file_path = tmp_key.name
-    print("✓ API Private Key (.pem.gpg) berjaya dinyahsulit.")
+    if not ssh_public_key and os.path.exists("python_script/ssh-key-2026-07-27.key.pub"):
+        with open("python_script/ssh-key-2026-07-27.key.pub", "r") as f:
+            ssh_public_key = f.read().strip()
 
-    # 2. Decrypt SSH Public Key (.pub.gpg)
-    ssh_pub_gpg = "python_script/ssh-key-2026-07-27.key.pub.gpg"
-    ssh_public_key = decrypt_gpg(ssh_pub_gpg, gpg_passphrase)
     if ssh_public_key:
-        print("✓ SSH Public Key (.pub.gpg) berjaya dinyahsulit.")
+        print("✓ SSH Public Key sedia disuntik ke VM.")
     else:
-        print("⚠️ SSH Public Key gagal dinyahsulit! VM akan dicipta tanpa akses SSH.")
+        print("⚠️ SSH Public Key tiada. VM akan dicipta tanpa akses kunci SSH.")
 
     print(f"✓ Tenancy OCID       : {tenancy[:15]}...{tenancy[-5:] if tenancy else ''}")
     print(f"✓ User OCID          : {user[:15]}...{user[-5:] if user else ''}")
@@ -102,11 +112,13 @@ def validate_config():
 
 
 def find_default_subnet(network_client, compartment_id):
+    print("⚠️ [AMARAN] OCI_SUBNET_ID tiada. Mencari Subnet VCN secara automatik...")
     try:
         vcns = network_client.list_vcns(compartment_id=compartment_id).data
         if vcns:
             subnets = network_client.list_subnets(compartment_id=compartment_id, vcn_id=vcns[0].id).data
             if subnets:
+                print(f"✓ Subnet dijumpai: {subnets[0].id}")
                 return subnets[0].id
     except Exception as e:
         print(f"❌ [RALAT AUTO SUBNET]: {e}")
@@ -126,18 +138,18 @@ def find_ubuntu_amd_image(compute_client, compartment_id):
         for img in images:
             name_lower = img.display_name.lower()
             if "24.04" in name_lower and "minimal" not in name_lower:
-                return img.id
+                return img.id, img.display_name
 
         for img in images:
             name_lower = img.display_name.lower()
             if "22.04" in name_lower and "minimal" not in name_lower:
-                return img.id
+                return img.id, img.display_name
 
         if images:
-            return images[0].id
+            return images[0].id, images[0].display_name
     except Exception as e:
         print(f"❌ [RALAT CARI IMAGE]: {e}")
-    return None
+    return None, None
 
 
 def run_sniper():
@@ -152,17 +164,42 @@ def run_sniper():
         identity_client = oci.identity.IdentityClient(config)
         compute_client = oci.core.ComputeClient(config)
         network_client = oci.core.VirtualNetworkClient(config)
+        print("✓ Autentikasi Kunci OCI SDK: BERJAYA")
     except Exception as e:
         print(f"❌ [RALAT AUTENTIKASI OCI SDK]: {e}")
         sys.exit(1)
 
-    ads = identity_client.list_availability_domains(compartment_id=config['tenancy']).data
-    ad_name = ads[0].name
+    try:
+        ads = identity_client.list_availability_domains(compartment_id=config['tenancy']).data
+        ad_name = ads[0].name
+        print(f"✓ Availability Domain: {ad_name}")
+    except Exception as e:
+        print(f"❌ [RALAT GET AD]: {e}")
+        sys.exit(1)
 
     if not subnet_id:
         subnet_id = find_default_subnet(network_client, compartment_id)
+        if not subnet_id:
+            print("❌ [RALAT SUBNET]: Subnet ID tidak dijumpai.")
+            sys.exit(1)
+    else:
+        print(f"✓ Subnet OCID: {subnet_id[:20]}...")
 
-    image_id = find_ubuntu_amd_image(compute_client, compartment_id)
+    image_id, image_name = find_ubuntu_amd_image(compute_client, compartment_id)
+    if not image_id:
+        print("❌ [RALAT IMAGE]: Tiada Image Ubuntu dijumpai.")
+        sys.exit(1)
+
+    print("\n" + "=" * 65)
+    print(" MENJALANKAN TEMBAKAN PERMOHONAN SLOT VM AMD ALWAYS FREE")
+    print("=" * 65)
+    print(f" Target Shape : VM.Standard.E2.1.Micro (AMD EPYC)")
+    print(f" Specs        : 1 OCPU (1/8 Micro Core), 1 GB RAM")
+    print(f" Storage      : 50 GB Boot Volume")
+    print(f" OS Image     : {image_name}")
+    print(f" Region       : {config['region']}")
+    print(f" AD Domain    : {ad_name}")
+    print("=" * 65 + "\n")
 
     metadata = {}
     if ssh_public_key:
@@ -174,7 +211,8 @@ def run_sniper():
         display_name="AlwaysFree-AMD-Micro",
         shape="VM.Standard.E2.1.Micro",
         source_details=oci.core.models.InstanceSourceViaImageDetails(
-            image_id=image_id
+            image_id=image_id,
+            boot_volume_size_in_gbs=50
         ),
         create_vnic_details=oci.core.models.CreateVnicDetails(
             subnet_id=subnet_id,
@@ -185,12 +223,17 @@ def run_sniper():
 
     try:
         response = compute_client.launch_instance(instance_details)
-        print(f"\n🎉 [BERJAYA!] VM AMD Micro baharu berjaya dicipta bersama kunci SSH!")
+        print(f"🎉 [BERJAYA!] VM AMD Micro berjaya dicipta!")
         print(f"Instance ID: {response.data.id}")
     except oci.exceptions.ServiceError as e:
-        print(f"❌ [RALAT OCI SERVICE]: Status {e.status} - {e.code}: {e.message}")
+        if e.status == 500 or "OutOfCapacity" in str(e):
+            print(f"⚠️  [FULL SLOT] Kapasiti penuh di {ad_name}. Status: {e.status} - {e.code}")
+        elif e.status == 400 and "LimitExceeded" in str(e):
+            print(f"⚠️  [LIMIT EXCEEDED] Anda telah mencapai had kuota VM AMD Always Free.")
+        else:
+            print(f"❌ [RALAT PERMOHONAN OCI]: Status {e.status} - {e.code}: {e.message}")
     except Exception as e:
-        print(f"❌ [RALAT UNKNOWN]: {e}")
+        print(f"❌ [RALAT SISTEM UNKNOWN]: {e}")
 
 
 if __name__ == "__main__":
