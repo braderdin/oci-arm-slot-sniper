@@ -1,0 +1,43 @@
+name: OCI AMD Sniper Loop (Every 20 Mins)
+
+on:
+  schedule:
+    - cron: '*/20 * * * *'  # Berjalan setiap 20 minit
+  workflow_dispatch:        # Boleh di-run secara manual dari dashboard GitHub
+
+concurrency:
+  group: oci-amd-sniper-group
+  cancel-in-progress: false
+
+jobs:
+  snipe-amd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run AMD Sniper Loop
+        env:
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_KEY_CONTENT: ${{ secrets.OCI_KEY_CONTENT }}
+          OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
+          OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
+        run: |
+          # Melakukan 10 percubaan setiap kali workflow dipanggil (selang 30 saat)
+          for i in {1..10}; do
+            echo "--- Tembakan AMD ke-$i ---"
+            python python_script/AMD_e2micro_1gbram_1ocpu.py || true
+            sleep 30
+          done
