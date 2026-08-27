@@ -22,7 +22,7 @@ jobs:
       # Cache direktori ~/.cache/pip dan ~/.cache/huggingface serentak
       - name: Pulihkan / Simpan Cache Pip
         id: pipeline-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/pip
