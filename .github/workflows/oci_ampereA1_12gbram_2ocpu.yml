@@ -1,8 +1,8 @@
-name: OCI ARM Sniper Loop (Every 15 Mins)
+name: OCI ARM Sniper Loop (Every 20 Mins)
 
 on:
 #  schedule:
-#    - cron: '*/15 * * * *'
+#    - cron: '*/20 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   snipe-arm:
     runs-on: ubuntu-latest
-    timeout-minutes: 14
+    timeout-minutes: 18
 
     steps:
       - uses: actions/checkout@v7
@@ -81,7 +81,7 @@ jobs:
           OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
           GPG_PASSPHRASE: ${{ secrets.OCI_KEY_PASSPHRASE }}
         run: |
-          for i in {1..10}; do
+          for i in {1..20}; do
             echo "🎯 --- Tembakan ARM ke-$i ---"
             python python_script/Ampere_A1_12gbram_2ocpu.py || true
             sleep 30
