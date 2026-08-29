@@ -1,2 +1,2 @@
-oci>=2.184.2
+oci>=2.185.0
 python-dotenv>=1.2.3
