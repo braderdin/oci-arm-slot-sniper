@@ -187,8 +187,8 @@ def run_sniper():
         sys.exit(1)
 
     shape = "VM.Standard.A1.Flex"
-    ocpus = 2.0
-    memory_in_gbs = 12.0
+    ocpus = 1.0
+    memory_in_gbs = 9.0
     boot_volume_size_gbs = 100
 
     print("\n" + "=" * 65)
