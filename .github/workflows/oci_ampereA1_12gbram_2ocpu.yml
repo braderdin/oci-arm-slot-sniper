@@ -1,4 +1,4 @@
-name: OCI ARM Sniper Loop (Every 20 Mins)
+name: OCI ARM Sniper Loop (Every 15 Mins)
 
 on:
 #  schedule:
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   snipe-arm:
     runs-on: ubuntu-latest
-    timeout-minutes: 17
+    timeout-minutes: 14
 
     steps:
       - uses: actions/checkout@v7
