@@ -1,4 +1,4 @@
-name: OCI ARM Sniper Loop (Every 20 Mins)
+name: TEST OCI ARM Sniper Loop
 
 on:
 #  schedule:
