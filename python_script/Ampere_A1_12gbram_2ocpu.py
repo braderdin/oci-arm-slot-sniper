@@ -187,9 +187,9 @@ def run_sniper():
         sys.exit(1)
 
     shape = "VM.Standard.A1.Flex"
-    ocpus = 1.0
-    memory_in_gbs = 6.0
-    boot_volume_size_gbs = 100
+    ocpus = 2
+    memory_in_gbs = 12
+    boot_volume_size_gbs = 50
 
     print("\n" + "=" * 65)
     print(" 🚀 MENJALANKAN TEMBAKAN PERMOHONAN SLOT VM ARM ALWAYS FREE")
